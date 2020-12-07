@@ -1,0 +1,15 @@
+---
+  - name: Setup iscsi target
+    become: yes
+    hosts: dc.sunflower.home
+    roles:
+      - role: 'OndrejHome.targetcli'
+    vars:
+      iscsi_targets:
+        - wwn: 'iqn.2020-12.home.sunflower:dc'
+          disks:
+            - path: '/dev/centos-target/backstore'
+              name: 'disk0'
+              type: 'block'
+          initiators:
+            - 'iqn.2020-12.home.sunflower:client1'

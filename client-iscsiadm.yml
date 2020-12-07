@@ -1,0 +1,20 @@
+---
+  - name: Install & Discover iscsitarget
+    hosts: centos-client.sunflower.home
+    become: yes
+    tasks:
+      - name: Install
+        yum:
+          name: iscsi-initiator-utils
+          state: present
+      - name: Set initiator name & restart iscsi(d)
+        shell: |
+          echo "InitiatorName=iqn.2020-12.home.sunflower:client1" > /etc/iscsi/initiatorname.iscsi
+          systemctl restart iscsi
+          systemctl restart iscsid
+      - name: Discover
+        community.general.open_iscsi:
+          login: yes
+          discover: yes
+          portal: dc.sunflower.home  
+    

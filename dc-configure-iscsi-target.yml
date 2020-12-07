@@ -1,0 +1,55 @@
+---
+  - name: Configure iscsi target on DC 
+    hosts: dc.sunflower.home
+    become: yes
+    tasks:
+      - name: Verify mdadm & targetcli
+        yum:
+          name:
+            - mdadm
+            - targetcli
+          state: present
+      - name: Check if raid md0 exists
+        stat:
+          path: /dev/md0
+          get_checksum: no
+          get_attributes: no
+          get_mime: no
+        register: _md0
+      - set_fact: md0={{_md0.stat.exists}}
+      # - debug:
+      #     msg: "exists!"
+      #   when: md0.stat.exists == True
+      - name: Clean /dev/sd[b-e]
+        shell: |
+          wipefs -a /dev/{{item}}
+          mdadm --zero-superblock /dev/{{item}}
+        loop: [sdb, sdc, sdd, sde]
+        when: not md0
+      - name: Make raid partitions
+        shell: |
+          parted --script /dev/{{item}} "mklabel gpt"
+          parted --script /dev/{{item}} "mkpart primary 0% 100%"
+          parted --script /dev/{{item}} "set 1 raid on"
+        loop: [sdb, sdc, sdd, sde]
+        when: not md0
+      - name: Create raid md0
+        shell: mdadm --create /dev/md0 --level=10 --raid-devices=4 /dev/sd[b-e]1
+        when: not md0
+      - name: Check if lvm named "backstore"
+        shell: if ! lvdisplay | grep -q backstore; then echo "no"; else echo "yes"; fi
+        register: _lv
+      - set_fact: lvm={{_lv.stdout|bool}}
+      - name: Create VG
+        community.general.lvg:
+          vg: centos-target
+          pvs: /dev/md0
+        when: not lvm
+      - name: Create LV
+        community.general.lvol:
+          vg: centos-target
+          lv: backstore
+          size: 100%FREE
+        when: not lvm
+  - name: targetcli
+    include: targetcli-setup.yml
